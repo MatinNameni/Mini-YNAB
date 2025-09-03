@@ -1,4 +1,51 @@
+from dataclasses import dataclass
+from datetime import datetime
+        
+        
+class CategoryManager:
+    def __init__(self):
+        self.income_categories = {
+            'Salary': ['Monthly Salary', 'Bonus', 'Freelance'],
+            'Investments': ['Dividends', 'Capital Gains', 'Interest'],
+            'Gifts': ['From Family', 'From Friends', 'Other'],
+            'Other': ['Miscellaneous Income']
+        }
+        
+        self.expense_categories = {
+            'Housing': ['Rent', 'Utilities', 'Maintenance'],
+            'Food': ['Groceries', 'Dining Out', 'Coffee'],
+            'Transportation': ['Public Transit', 'Fuel', 'Repairs'],
+            'Entertainment': ['Movies', 'Concerts', 'Games'],
+            'Health': ['Medical Bills', 'Pharmacy', 'Insurance'],
+            'Shopping': ['Clothing', 'Electronics', 'Gifts'],
+            'Savings': ['Emergency Fund', 'Retirement', 'Investments'],
+            'Debt': ['Credit Card', 'Loans', 'Mortgage'],
+            'Miscellaneous': ['Donations', 'Pet Care', 'Education', 'Other'],
+            'Other': ['Miscellaneous Expense']
+        }
+    
+    def is_category_correct(self, action_type: str, category: str, subcategory: str) -> bool:
+        if action_type.lower() == 'income' and category.title() in self.income_categories:
+            if subcategory.title() in self.income_categories[category.title()]:
+                return True
+        elif action_type.lower() == 'expense' and category.title() in self.expense_categories:
+            if subcategory.title() in self.expense_categories[category.title()]:
+                return True
+        return False
+
+
+@dataclass
 class Card:
-    def __init__(self, name: str, budget: float):
-        self.name = name
-        self.budget = budget
+    name: str
+    balance: float = 0.0
+        
+
+@dataclass
+class Transaction:
+    id: int | None
+    action_type: str   # "income" or "expense"
+    card_name: str
+    amount: float
+    category: str
+    subcategory: str
+    timestamp: datetime | None = None
