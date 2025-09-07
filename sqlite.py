@@ -1,20 +1,75 @@
 import sqlite3
+from abc import ABC, abstractmethod
 from models import Transaction, Card
+from typing import Any
 
-class WalletDAO:
+class DatabaseConnectionManager:
+    _instance = None
+    
+    def __new__(cls, db_path: str = 'Budget.db'):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.db_path = db_path
+        return cls._instance
+    
+    def get_connection(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
+class BaseDAO(ABC):
+    @abstractmethod
+    def create_table(self):
+        pass
+    
+    @abstractmethod
+    def insert(self, *args):
+        pass
+    
+    @abstractmethod
+    def get_all(self) -> list[Any]:
+        pass
+    
+    @abstractmethod
+    def __enter__(self):
+        pass
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
+
+
+class WalletDAO(BaseDAO):
     def __init__(self):
-        self.conn = sqlite3.connect('Budget.db')
+        self.db_manager = DatabaseConnectionManager()
+
+        
+    def __enter__(self):
+        self.conn = self.db_manager.get_connection()
         self.c = self.conn.cursor()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.conn:
+            self.conn.close()
     
     def create_table(self):
         self.c.execute('''CREATE TABLE IF NOT EXISTS Wallet(
                         card_name TEXT PRIMARY KEY,
                         balance REAL
                       )''')
+        self.conn.commit()
         
-    def insert_card(self, card_name: str, balance: float):
-        with self.conn:
-            self.c.execute("INSERT INTO Wallet VALUES (:card_name, :balance)", {'card_name': card_name, 'balance': balance})
+    def insert(self, card_name: str, balance: float):
+        self.c.execute("INSERT INTO Wallet VALUES (:card_name, :balance)", {'card_name': card_name, 'balance': balance})
+        self.conn.commit()
+            
+            
+    def get_all(self) -> list[Card]:
+        self.c.execute("SELECT * FROM Wallet")
+        rows = self.c.fetchall()
+        return [Card(*row) for row in rows]
     
     def get_cards_name(self) -> list[str]:
         self.c.execute("SELECT card_name FROM Wallet")
@@ -27,34 +82,32 @@ class WalletDAO:
         result = self.c.fetchone()
         return Card(*result)
 
-    def get_balance(self) -> float:
+    def get_total_balance(self) -> float:
         #Return the total budget across all cards
         self.c.execute("SELECT SUM(balance) FROM Wallet")
         result = self.c.fetchone()
         return result[0] if result else 0.0
     
-    def get_wallet(self) -> list[Card]:
-        self.c.execute("SELECT * FROM Wallet")
-        rows = self.c.fetchall()
-        return [Card(*row) for row in rows]
-    
     def edit_balance(self, card_name: str, new_balance: float):
-        with self.conn:
-            self.c.execute("""UPDATE Wallet SET balance = :balance
-                           WHERE card_name = :card_name""",
-                           {'balance': new_balance, 'card_name': card_name})
-            
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.conn.close()
+        self.c.execute("""UPDATE Wallet SET balance = :balance
+                        WHERE card_name = :card_name""",
+                        {'balance': new_balance, 'card_name': card_name})
+        self.conn.commit()
         
 
-class TransactionsDAO:
+class TransactionsDAO(BaseDAO):
     def __init__(self):
-        self.conn = sqlite3.connect('Budget.db')
+        self.db_manager = DatabaseConnectionManager()
+
+        
+    def __enter__(self):
+        self.conn = self.db_manager.get_connection()
         self.c = self.conn.cursor()
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.conn:
+            self.conn.close()
         
     def create_table(self):
         self.c.execute('''CREATE TABLE IF NOT EXISTS Transactions(
@@ -66,15 +119,16 @@ class TransactionsDAO:
                         subcategory TEXT,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                       )''')
+        self.conn.commit()
         
-    def insert_transaction(self, action_type: str, card_name: str, amount: float, category: str, subcategory: str):
-        with self.conn:
-            self.c.execute('''INSERT INTO Transactions (action_type, card_name, amount, category, subcategory)
-                           VALUES (:action_type, :card_name, :amount, :category, :subcategory)''',
-                           {'action_type': action_type, 'card_name': card_name, 'amount': amount,
-                            'category': category, 'subcategory': subcategory})
+    def insert(self, action_type: str, card_name: str, amount: float, category: str, subcategory: str):
+        self.c.execute('''INSERT INTO Transactions (action_type, card_name, amount, category, subcategory)
+                        VALUES (:action_type, :card_name, :amount, :category, :subcategory)''',
+                        {'action_type': action_type, 'card_name': card_name, 'amount': amount,
+                        'category': category, 'subcategory': subcategory})
+        self.conn.commit()
             
-    def get_all_transactions(self) -> list[Transaction]:
+    def get_all(self) -> list[Transaction]:
         self.c.execute("SELECT * FROM Transactions ORDER BY timestamp DESC")
         rows = self.c.fetchall()
         return [Transaction(*row) for row in rows]
@@ -109,20 +163,14 @@ class TransactionsDAO:
         }
         
         if range in date_ranges:
-            self.c.execute("""SELECT * FROM Transactions 
+            self.c.execute("""SELECT * FROM Transactions
                            WHERE DATE(timestamp) >= DATE('now', :range)""",
                            {'range': date_ranges[range]})
             rows = self.c.fetchall()
             return [Transaction(*row) for row in rows]
             
     def edit_category(self, id: int, new_category: str, new_subcategory: str):
-        with self.conn:
-            self.c.execute("""UPDATE Transactions SET category = :category, subcategory = :subcategory
-                           WHERE id = :id""",
-                           {'category': new_category, 'subcategory': new_subcategory, 'id': id})
-            
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.conn.close()
+        self.c.execute("""UPDATE Transactions SET category = :category, subcategory = :subcategory
+                       WHERE id = :id""",
+                       {'category': new_category, 'subcategory': new_subcategory, 'id': id})
+        self.conn.commit()

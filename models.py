@@ -8,7 +8,7 @@ class CategoryManager:
             'Salary': ['Monthly Salary', 'Bonus', 'Freelance'],
             'Investments': ['Dividends', 'Capital Gains', 'Interest'],
             'Gifts': ['From Family', 'From Friends', 'Other'],
-            'Other': ['Miscellaneous Income']
+            'Miscellaneous': ['Other']
         }
         
         self.expense_categories = {
@@ -20,8 +20,7 @@ class CategoryManager:
             'Shopping': ['Clothing', 'Electronics', 'Gifts'],
             'Savings': ['Emergency Fund', 'Retirement', 'Investments'],
             'Debt': ['Credit Card', 'Loans', 'Mortgage'],
-            'Miscellaneous': ['Donations', 'Pet Care', 'Education', 'Other'],
-            'Other': ['Miscellaneous Expense']
+            'Miscellaneous': ['Donations', 'Pet Care', 'Education', 'Other']
         }
     
     def is_category_correct(self, action_type: str, category: str, subcategory: str) -> bool:
