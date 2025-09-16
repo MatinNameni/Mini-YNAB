@@ -26,38 +26,31 @@ class BaseDAO(ABC):
     @abstractmethod
     def insert(self, *args):
         pass
-    
+
     @abstractmethod
-    def get_all(self) -> list[Any]:
-        pass
-    
-    @abstractmethod
-    def __enter__(self):
+    def remove(self, *args):
         pass
 
     @abstractmethod
-    def __exit__(self, exc_type, exc_value, traceback):
+    def edit(self, *args):
+        pass
+    
+    @abstractmethod
+    def get_all(self) -> list[Any]:
         pass
 
 
 class WalletDAO(BaseDAO):
     def __init__(self):
         self.db_manager = DatabaseConnectionManager()
-
-        
-    def __enter__(self):
         self.conn = self.db_manager.get_connection()
         self.c = self.conn.cursor()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if self.conn:
-            self.conn.close()
+        self.create_table()
     
     def create_table(self):
         self.c.execute('''CREATE TABLE IF NOT EXISTS Wallet(
-                        card_name TEXT PRIMARY KEY,
-                        balance REAL
+                        CardName TEXT PRIMARY KEY,
+                        Balance REAL
                       )''')
         self.conn.commit()
         
@@ -65,6 +58,17 @@ class WalletDAO(BaseDAO):
         self.c.execute("INSERT INTO Wallet VALUES (:card_name, :balance)", {'card_name': card_name, 'balance': balance})
         self.conn.commit()
             
+    def remove(self, card_name: str):
+        self.c.execute("""DELETE FROM Wallet
+                       WHERE CardName = :card_name""",
+                       {"card_name": card_name})
+        self.conn.commit()
+
+    def edit(self, card_name: str, new_card_name: str, new_balance: float):
+        self.c.execute("""UPDATE Wallet SET CardName = :new_card_name, Balance = :new_balance
+                        WHERE CardName = :card_name""",
+                        {'new_card_name': new_card_name, 'new_balance': new_balance, 'card_name': card_name})
+        self.conn.commit()
             
     def get_all(self) -> list[Card]:
         self.c.execute("SELECT * FROM Wallet")
@@ -72,84 +76,100 @@ class WalletDAO(BaseDAO):
         return [Card(*row) for row in rows]
     
     def get_cards_name(self) -> list[str]:
-        self.c.execute("SELECT card_name FROM Wallet")
+        self.c.execute("SELECT CardName FROM Wallet")
         result = self.c.fetchall()
         cards = [card[0] for card in result]
         return cards
         
     def get_card(self, card_name: str) -> Card:
-        self.c.execute("SELECT * FROM Wallet WHERE card_name = :card_name", {'card_name': card_name})
+        self.c.execute("SELECT * FROM Wallet WHERE CardName = :card_name", {'card_name': card_name})
         result = self.c.fetchone()
         return Card(*result)
 
     def get_total_balance(self) -> float:
         #Return the total budget across all cards
-        self.c.execute("SELECT SUM(balance) FROM Wallet")
+        self.c.execute("SELECT SUM(Balance) FROM Wallet")
         result = self.c.fetchone()
         return result[0] if result else 0.0
     
-    def edit_balance(self, card_name: str, new_balance: float):
-        self.c.execute("""UPDATE Wallet SET balance = :balance
-                        WHERE card_name = :card_name""",
-                        {'balance': new_balance, 'card_name': card_name})
-        self.conn.commit()
-        
 
 class TransactionsDAO(BaseDAO):
     def __init__(self):
         self.db_manager = DatabaseConnectionManager()
-
-        
-    def __enter__(self):
         self.conn = self.db_manager.get_connection()
         self.c = self.conn.cursor()
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        if self.conn:
-            self.conn.close()
+        self.create_table()
         
     def create_table(self):
-        self.c.execute('''CREATE TABLE IF NOT EXISTS Transactions(
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        action_type TEXT,
-                        card_name TEXT,
-                        amount REAL,
-                        category TEXT,
-                        subcategory TEXT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                      )''')
+        self.c.execute("""CREATE TABLE IF NOT EXISTS Transactions(
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ActionType TEXT,
+                    CardName TEXT,
+                    Amount REAL,
+                    Category TEXT,
+                    Subcategory TEXT,
+                    Date DATE DEFAULT CURRENT_DATE
+                  )""")
         self.conn.commit()
         
-    def insert(self, action_type: str, card_name: str, amount: float, category: str, subcategory: str):
-        self.c.execute('''INSERT INTO Transactions (action_type, card_name, amount, category, subcategory)
-                        VALUES (:action_type, :card_name, :amount, :category, :subcategory)''',
-                        {'action_type': action_type, 'card_name': card_name, 'amount': amount,
-                        'category': category, 'subcategory': subcategory})
+    def insert(self, action_type: str, card_name: str, amount: float, category: str, subcategory: str, date: str = None):
+        if date:
+            self.c.execute("""INSERT INTO Transactions (ActionType, CardName, Amount, Category, Subcategory, Date)
+                            VALUES (:action_type, :card_name, :amount, :category, :subcategory, :date)""",
+                            {'action_type': action_type, 'card_name': card_name, 'amount': amount,
+                            'category': category, 'subcategory': subcategory, 'date': date})
+        else:
+            self.c.execute("""INSERT INTO Transactions (ActionType, CardName, Amount, Category, Subcategory)
+                            VALUES (:action_type, :card_name, :amount, :category, :subcategory)""",
+                            {'action_type': action_type, 'card_name': card_name, 'amount': amount,
+                            'category': category, 'subcategory': subcategory})
         self.conn.commit()
+
+    def edit(self, id: int, new_category: str, new_subcategory: str, new_date: str):
+        self.c.execute("""UPDATE Transactions SET Category = :new_category, Subcategory = :new_subcategory, Date = :new_date
+                       WHERE ID = :id""",
+                       {'new_category': new_category, 'new_subcategory': new_subcategory, 'new_date': new_date, 'id': id})
+        self.conn.commit()
+
+    def remove(self, id: int):
+        self.c.execute("""DELETE FROM Transactions
+                       WHERE ID = :id""",
+                       {"id": id})
+        self.conn.commit()
+
             
     def get_all(self) -> list[Transaction]:
-        self.c.execute("SELECT * FROM Transactions ORDER BY timestamp DESC")
+        self.c.execute("SELECT * FROM Transactions ORDER BY Date ASC")
         rows = self.c.fetchall()
         return [Transaction(*row) for row in rows]
+    
+    def get_ids(self) -> list[int]:
+        self.c.execute("SELECT ID FROM Transactions")
+        ids =  self.c.fetchall()
+        return [int(*id) for id in ids]
+    
+    def get_transaction_by_id(self, id: int) -> Transaction:
+        self.c.execute("SELECT * FROM Transactions WHERE ID = :id", {"id": id})
+        tran = self.c.fetchone()
+        return Transaction(*tran)
 
     def get_transactions_by_card(self, card_name: str) -> list[Transaction]:
         self.c.execute("""SELECT * FROM Transactions 
-                       WHERE card_name = :card_name""",
+                       WHERE CardName = :card_name""",
                        {'card_name': card_name})
         rows = self.c.fetchall()
         return [Transaction(*row) for row in rows]
     
     def get_transactions_by_type(self, action_type: str) -> list[Transaction]:
         self.c.execute("""SELECT * FROM Transactions 
-                       WHERE action_type = :action_type""",
+                       WHERE ActionType = :action_type""",
                        {'action_type': action_type})
         rows = self.c.fetchall()
         return [Transaction(*row) for row in rows]
     
     def get_transactions_by_category(self, category: str) -> list[Transaction]:
         self.c.execute("""SELECT * FROM Transactions 
-                       WHERE category = :category""",
+                       WHERE Category = :category""",
                        {'category': category})
         rows = self.c.fetchall()
         return [Transaction(*row) for row in rows]
@@ -157,20 +177,16 @@ class TransactionsDAO(BaseDAO):
     def get_transactions_by_date_range(self, range: str) -> list[Transaction]:
         date_ranges = {
             'Today': "start of day",
-            'This Week': "start of week",
             'This Month': "start of month",
             'This Year': "start of year"
         }
         
         if range in date_ranges:
             self.c.execute("""SELECT * FROM Transactions
-                           WHERE DATE(timestamp) >= DATE('now', :range)""",
+                           WHERE DATE(Date) >= DATE('now', :range)""",
                            {'range': date_ranges[range]})
-            rows = self.c.fetchall()
-            return [Transaction(*row) for row in rows]
-            
-    def edit_category(self, id: int, new_category: str, new_subcategory: str):
-        self.c.execute("""UPDATE Transactions SET category = :category, subcategory = :subcategory
-                       WHERE id = :id""",
-                       {'category': new_category, 'subcategory': new_subcategory, 'id': id})
-        self.conn.commit()
+        elif range == "This Week":
+            self.c.execute("""SELECT * FROM Transactions
+                           WHERE DATE(Date) >= DATE('now', 'weekday 0', '-7 days')""")
+        rows = self.c.fetchall()
+        return [Transaction(*row) for row in rows]

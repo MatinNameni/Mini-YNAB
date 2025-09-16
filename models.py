@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+import datetime
         
         
 class CategoryManager:
@@ -42,9 +42,9 @@ class Card:
 @dataclass
 class Transaction:
     id: int | None
-    action_type: str   # "income" or "expense"
+    action_type: str   # "Income" or "Expense"
     card_name: str
     amount: float
     category: str
     subcategory: str
-    timestamp: datetime | None = None
+    date: datetime.date | None = None

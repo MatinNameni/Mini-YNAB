@@ -16,7 +16,7 @@ class CardNotFoundError(WalletError):
         self.message = message
         
     def __str__(self) -> str:
-        return self.message
+        return f'CardNotFoundError: {self.message}'
 
 
 class CardAlreadyExistsError(WalletError):
@@ -25,7 +25,7 @@ class CardAlreadyExistsError(WalletError):
         self.message = message
         
     def __str__(self) -> str:
-        return self.message
+        return f'CardAlreadyExistsError: {self.message}'
 
   
 class NotEnoughBalanceError(WalletError):
@@ -34,7 +34,7 @@ class NotEnoughBalanceError(WalletError):
         self.message = message
         
     def __str__(self) -> str:
-        return self.message
+        return f'NotEnoughBalanceError: {self.message}'
     
     
 class CategoryNotFoundError(TransactionError):
@@ -43,4 +43,22 @@ class CategoryNotFoundError(TransactionError):
         self.message = message
         
     def __str__(self) -> str:
-        return self.message
+        return f'TransactionNotFoundError: {self.message}'
+    
+
+class TransactionNotFoundError(TransactionError):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+        
+    def __str__(self) -> str:
+        return f'TransactionNotFoundError: {self.message}'
+    
+
+class InvalidDateFormatError(TransactionError):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+        
+    def __str__(self) -> str:
+        return f'InvalidDateFormatError: {self.message}'
